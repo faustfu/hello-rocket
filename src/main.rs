@@ -2,6 +2,8 @@
 
 use rocket::{get, routes, Rocket};
 
+// Rocket uses attributes, which look like function decorators
+//  in other languages, to make declaring routes easy.
 #[get("/")]
 fn root() -> &'static str {
     "Hello, world!"
@@ -14,7 +16,7 @@ fn hi(name: String) -> String {
 
 fn rocket() -> Rocket {
     rocket::ignite()
-        .mount("/", routes![root])
+        .mount("/", routes![root]) //with multiple routes: routes![a, b, c].
         .mount("/hi", routes![hi])
 }
 
@@ -24,7 +26,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use super::rocket;
+    use super::rocket; // include the rocket constructor
     use rocket::http::Status;
     use rocket::local::Client;
 
