@@ -4,6 +4,7 @@ use rocket::{get, routes, Rocket};
 
 // Rocket uses attributes, which look like function decorators
 //  in other languages, to make declaring routes easy.
+// methods/attributes include get, put, post, delete, head, patch, or options.
 #[get("/")]
 fn root() -> &'static str {
     "Hello, world!"
