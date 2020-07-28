@@ -2,23 +2,51 @@
 
 use rocket::{get, routes, Rocket};
 
-// Rocket uses attributes, which look like function decorators
+use rocket::response::NamedFile;
+use std::path::{Path, PathBuf};
+
+use rocket_contrib::serve::StaticFiles;
+
+// 1. Rocket uses attributes, which look like function decorators
 //  in other languages, to make declaring routes easy.
-// methods/attributes include get, put, post, delete, head, patch, or options.
+// 2. Methods/attributes include get, put, post, delete, head, patch, or options.
 #[get("/")]
 fn root() -> &'static str {
     "Hello, world!"
 }
 
+// 1. Dynamic path with variables.
+// 2. Variables could be any types that implemented trait:FromParam.
 #[get("/<name>")]
 fn hi(name: String) -> String {
     format!("Hi, {}!", name)
+}
+
+// 1. Use multiple segment variable to map download route into static folder.
+#[get("/<file..>")]
+fn files(file: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new("download/").join(file)).ok()
+}
+
+// 1. Forward the request if types are not matched.
+#[get("/<id>")]
+fn user_int(id: usize) -> String {
+    format!("Hi, user#{}!", id)
+}
+
+// 1. Use rank parameter to resolve path collision.
+#[get("/<id>", rank = 2)]
+fn user(id: String) -> String {
+    format!("Hi, user {}!", id)
 }
 
 fn rocket() -> Rocket {
     rocket::ignite()
         .mount("/", routes![root]) //with multiple routes: routes![a, b, c].
         .mount("/hi", routes![hi])
+        .mount("/download", routes![files])
+        .mount("/public", StaticFiles::from("/static"))
+        .mount("/user", routes![user_int, user])
 }
 
 fn main() {
