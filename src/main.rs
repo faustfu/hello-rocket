@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use rocket_contrib::serve::StaticFiles;
 
+use rocket::request::{Form, FromForm};
+
 // 1. Rocket uses attributes, which look like function decorators
 //  in other languages, to make declaring routes easy.
 // 2. Methods/attributes include get, put, post, delete, head, patch, or options.
@@ -40,13 +42,40 @@ fn user(id: String) -> String {
     format!("Hi, user {}!", id)
 }
 
+// 1. Use query parameters with form.
+#[derive(FromForm, Debug)]
+struct User {
+    name: String,
+    account: usize,
+}
+
+#[get("/add?<id>&<user..>")]
+fn user_add_form(id: usize, user: Form<User>) -> String {
+    format!("Hi, user {} with {:?}!", id, user)
+}
+
+// 1. Use segment keyword and variables.
+#[get("/?nonsense&<name>")]
+fn query(name: String) -> String {
+    format!("Hi, {}!", name)
+}
+
+// 1. Use optional variables.
+#[get("/?nonsense&<name>")]
+fn query_optional(name: Option<String>) -> String {
+    name.map(|name| format!("Hi, {}!", name))
+        .unwrap_or_else(|| "Hi!".into())
+}
+
 fn rocket() -> Rocket {
     rocket::ignite()
-        .mount("/", routes![root]) //with multiple routes: routes![a, b, c].
+        .mount("/", routes![root])
         .mount("/hi", routes![hi])
         .mount("/download", routes![files])
         .mount("/public", StaticFiles::from("/static"))
-        .mount("/user", routes![user_int, user])
+        .mount("/user", routes![user_int, user, user_add_form])
+        .mount("/query", routes![query])
+        .mount("/query_optional", routes![query_optional])
 }
 
 fn main() {
@@ -68,10 +97,58 @@ mod test {
     }
 
     #[test]
+    fn query_before() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/query/?nonsense&name=me").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi, me!".into()));
+    }
+
+    #[test]
+    fn query_after() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/query/?name=me&nonsense").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi, me!".into()));
+    }
+
+    #[test]
+    fn query_optional() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/query_optional/?nonsense").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi!".into()));
+    }
+
+    #[test]
     fn hi() {
         let client = Client::new(rocket()).expect("valid rocket instance");
         let mut response = client.get("/hi/me").dispatch();
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.body_string(), Some("Hi, me!".into()));
+    }
+
+    #[test]
+    fn user_id_number() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/user/123").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi, user#123!".into()));
+    }
+
+    #[test]
+    fn user_id_string() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/user/123a").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi, user 123a!".into()));
+    }
+
+    #[test]
+    fn user_add_form() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/user/add?id=100&name=sandal&account=400").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi, user 100 with Form(User { name: \"sandal\", account: 400 })!".into()));
     }
 }
