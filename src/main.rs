@@ -9,6 +9,8 @@ use rocket_contrib::serve::StaticFiles;
 
 use rocket::request::{Form, FromForm};
 
+use rocket::http::Method;
+
 // 1. Rocket uses attributes, which look like function decorators
 //  in other languages, to make declaring routes easy.
 // 2. Methods/attributes include get, put, post, delete, head, patch, or options.
@@ -67,6 +69,12 @@ fn query_optional(name: Option<String>) -> String {
         .unwrap_or_else(|| "Hi!".into())
 }
 
+// 1. Use request guards to preprocessing the request
+#[get("/")]
+fn guard_method(m: Method) -> String {
+    format!("Hi, user with method:{}!", m)
+}
+
 fn rocket() -> Rocket {
     rocket::ignite()
         .mount("/", routes![root])
@@ -76,6 +84,7 @@ fn rocket() -> Rocket {
         .mount("/user", routes![user_int, user, user_add_form])
         .mount("/query", routes![query])
         .mount("/query_optional", routes![query_optional])
+        .mount("/guard", routes![guard_method])
 }
 
 fn main() {
@@ -147,8 +156,21 @@ mod test {
     #[test]
     fn user_add_form() {
         let client = Client::new(rocket()).expect("valid rocket instance");
-        let mut response = client.get("/user/add?id=100&name=sandal&account=400").dispatch();
+        let mut response = client
+            .get("/user/add?id=100&name=sandal&account=400")
+            .dispatch();
         assert_eq!(response.status(), Status::Ok);
-        assert_eq!(response.body_string(), Some("Hi, user 100 with Form(User { name: \"sandal\", account: 400 })!".into()));
+        assert_eq!(
+            response.body_string(),
+            Some("Hi, user 100 with Form(User { name: \"sandal\", account: 400 })!".into())
+        );
+    }
+
+    #[test]
+    fn guard_method() {
+        let client = Client::new(rocket()).expect("valid rocket instance");
+        let mut response = client.get("/guard").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.body_string(), Some("Hi, user with method:GET!".into()));
     }
 }
